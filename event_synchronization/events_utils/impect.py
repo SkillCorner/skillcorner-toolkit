@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from event_synchronization.constants import GENERIC_EVENT, PASS_EVENT, SHOT_EVENT
 from event_synchronization.events_utils.event import Event
 from event_synchronization.events_utils.players_mapping_manager import SkcPlayersMapping
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 KEY_JNO = 'shirtNumber'
 PASS_TYPE_ID = 'PASS'
@@ -91,7 +94,7 @@ class ImpectEvents:
 
         return self.impect_team_id_to_skc_team_id.get(impect_team_id, None)
 
-    def get_timestamp(self, event: dict) -> float:
+    def get_timestamp(self, event: dict | pd.Series) -> float:
         """Get event timestamp
 
         Args:
@@ -100,8 +103,28 @@ class ImpectEvents:
         Returns:
             timestamp (float): timestamp of the event
         """
+        # Supports both:
+        # - raw dict event: event['gameTime']['gameTimeInSec']
+        # - pandas-normalized event (pd.Series): event['gameTime_gameTimeInSec']
+        if isinstance(event, dict):
+            ts_in_sec = event['gameTime']['gameTimeInSec']
+            period_id = event['periodId']
+        else:
+            # pandas Series / mapping-like row
+            ts_in_sec = event.get('gameTime_gameTimeInSec')
+            if ts_in_sec is None and 'gameTime' in event and isinstance(event.get('gameTime'), dict):
+                ts_in_sec = event['gameTime'].get('gameTimeInSec')
+            period_id = event.get('periodId')
 
-        return event['gameTime_gameTimeInSec'] - PERIOD_STARTS_IN_SEC[int(event['periodId'])]
+        if ts_in_sec is None or period_id is None:
+            msg = (
+                "Missing 'gameTimeInSec' or 'periodId' in event. "
+                "Expected either ['gameTime']['gameTimeInSec'] + 'periodId' (dict) "
+                "or 'gameTime_gameTimeInSec' + 'periodId' (normalized row)."
+            )
+            raise KeyError(msg)
+
+        return float(ts_in_sec) - PERIOD_STARTS_IN_SEC[int(period_id)]
 
     def get_event_location(self, event: dict) -> tuple[float, float] | tuple[str, str]:
         """Get event location
