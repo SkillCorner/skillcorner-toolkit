@@ -8,7 +8,8 @@ The objective is to synchronize the events provided by Wyscout, Opta, StatsBomb,
 2. [Installation](#installation)
 3. [Usage with tracking](#usage-with-tracking)
 4. [Usage with dynamic events only](#usage-with-dynamic-events-only)
-5. [License](#license)
+5. [Robustness — missing on_ball_engagement](#robustness--missing-on_ball_engagement)
+6. [License](#license)
 
 ## Description
 
@@ -179,20 +180,56 @@ You also have access to some notebook examples in: `tools/notebook_example` (Don
 
 ## WITH DYNAMIC EVENTS
 
-This mode corresponds to the logic in `event_synchronization/with_dynamic_events/`. It does require only SkillCorner dynamic events and provider events (StatsBomb, Impect, Wyscout). Sync with Opta is not yet available with dynamic events.
+This mode corresponds to the logic in `event_synchronization/with_dynamic_events/`. It requires only SkillCorner **dynamic events** and provider events (StatsBomb, Impect, Wyscout). Sync with Opta is not yet available in this mode.
 
-Typical usage patterns:
+### What gets synchronized depends on your SkillCorner Game Intelligence access
 
-- Via python scripts:
+| Your SKC access | What is synchronized |
+|---|---|
+| **GI IP + OOP** (`player_possession` + `on_ball_engagement`) | Full sync: player possessions **and** duels/pressures |
+| **GI IP only** (`player_possession`) | Player possessions only — duels/pressures are skipped automatically |
 
-    Fill the `load_data` function to add path of skc and provider files
-    - run `python -m tools.run_statsbomb`
-    - run `python -m tools.run_impect`
-    - run `python -m tools.run_wyscout`
+> `off_ball_run` and `passing_option` events are also synchronized: they inherit the provider event IDs from their associated `player_possession`.
 
-- Via notebooks:
-    - Fill the notebook cells with the appropriate code to load and process the data in `/with_dynamic_events/notebooks/`.
-    - Run the cells sequentially to perform synchronization and analysis.
+Supported providers and features:
+
+| Provider  | IP — Player Possessions | Duels | OOP — Pressures |
+|-----------|:-----------------------:|:-----------:|:---------------:|
+| StatsBomb | ✅                      | ✅          | ✅              |
+| Impect    | ✅                      | ✅          | —               |
+| Wyscout   | ✅                      | ✅          | —               |
+
+### Usage
+
+- **Via Python scripts** (fill the `load_data` section with the paths to your files):
+    ```sh
+    python -m tools.with_dynamic_events.run_statsbomb
+    python -m tools.with_dynamic_events.run_impect
+    python -m tools.with_dynamic_events.run_wyscout
+    ```
+
+- **Via notebooks** — fill in the parameters and run cells sequentially:
+    - `tools/with_dynamic_events/notebooks/run_statsbomb.ipynb`
+    - `tools/with_dynamic_events/notebooks/run_impect.ipynb`
+    - `tools/with_dynamic_events/notebooks/run_wyscout.ipynb`
+
+The notebooks expect the following variables to be set before running the synchronization cell:
+
+| Variable | Description |
+|---|---|
+| `MATCH_ID` | SkillCorner match ID (integer) |
+| `data_dir` | Path to the folder containing provider files |
+| `skc_client` | Authenticated `SkillcornerClient` instance |
+
+> **Note:** Don't forget to install the `skillcorner` package (`pip install skillcorner`) to use `SkillcornerClient`.
+
+### Outputs
+
+`run()` returns a tuple `(skc_events_mapping, provider_events_mapping)`:
+
+- **`skc_events_mapping`**: one row per SkillCorner event enriched with the matched provider IDs and pattern (`FT`, `Possession`, `LT`, `Duel`, `Pressure`, …).
+- **`provider_events_mapping`**: one row per provider event enriched with the matched SkillCorner `event_id` and `dynamic_matched` flag.
+---
 
 ## License
 
