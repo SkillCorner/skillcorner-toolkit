@@ -326,12 +326,20 @@ def preprocess_sb_events(sb_events_sync: pd.DataFrame, skc_events: pd.DataFrame)
         'player_name',
         'player_id',
         'frame_start',
-        'frame_physical_start',
         'frame_end',
         'end_type',
-        'player_in_possession_id',
-        'player_in_possession_name',
-        'event_subtype',
+        'game_interruption_before',
+        'game_interruption_after',
+    ]
+
+    cols_obe = [
+        'event_id',
+        'player_name',
+        'player_id',
+        'frame_start',
+        'frame_end',
+        'frame_physical_start',
+        'end_type',
         'game_interruption_before',
         'game_interruption_after',
     ]
@@ -353,7 +361,15 @@ def preprocess_sb_events(sb_events_sync: pd.DataFrame, skc_events: pd.DataFrame)
     ]
 
     pp_sorted = pp.sort_values(['frame_start'])[list(set(cols_pp))].reset_index(drop=True)
-    obe_sorted = obe.sort_values(['frame_start'])[list(set(cols_pp))].reset_index(drop=True)
+
+    # If SKC has no on_ball_engagement events, we still want PP synchronization to run.
+    # Downstream pressure/duel matching relies on obe_sorted; returning an empty dataframe
+    # with the expected columns lets callers safely skip these steps.
+    if obe.empty:
+        obe_sorted = pd.DataFrame(columns=list(set(cols_obe)))
+    else:
+        obe_sorted = obe.sort_values(['frame_start'])[list(set(cols_obe))].reset_index(drop=True)
+
 
     sb_sorted = sb_three.sort_values(['skc_frame'])[list(set(cols_sb) & set(sb_three.columns))].reset_index(drop=True)
     sb_pressure = sb.query("type_name == 'Pressure'").copy()
@@ -418,6 +434,11 @@ def preprocess_prov_events(
     events = events_sync.copy()
     pp = skc_events.query("event_type == 'player_possession'").copy()
     obe_sorted = skc_events.query("event_type == 'on_ball_engagement'").sort_values(['frame_start']).copy()
+
+    # If SKC has no on_ball_engagement events, keep an empty dataframe so PP matching
+    # can still run. Callers can then skip duel/pressure matching.
+    if obe_sorted.empty:
+        obe_sorted = pd.DataFrame(columns=list(skc_events.columns))
 
     # Filter imp to actionable types for PP mapping
     prov_col_name = globals()[f'COL_TYPE_{provider}']
@@ -630,6 +651,11 @@ def match_duels(  # noqa: C901, PLR0913, PLR0915
 def apply_matching_duels(
     provider_events: pd.DataFrame, obe_sorted: pd.DataFrame, duels_pp_used_ids: set[Any], provider: str
 ) -> pd.DataFrame:
+    # If SKC doesn't have on_ball_engagement events, we can't align duels.
+    # Keep PP synchronization running by returning an empty match.
+    if obe_sorted is None or obe_sorted.empty:
+        return pd.DataFrame(), set(duels_pp_used_ids)
+
     col_duel_id = 'duel_playerId' if provider == 'impect' else 'groundDuel_opponent_id'
 
     map_player_ids = provider_events[['skc_player_id', 'player_id']].drop_duplicates()

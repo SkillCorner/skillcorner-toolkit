@@ -149,13 +149,20 @@ class StatsbombSyncDynamicEventsManager:
         ]
         mapping_pp_bundles = pd.DataFrame(pp_bundles)
 
-        matched_pressure_sb, matched_pressure_skc = match_pressures_sb(sb_pressure, obe_sorted)
+        if obe_sorted is None or obe_sorted.empty:
+            # No on_ball_engagement in SKC => keep PP sync, but skip pressure/duel alignment.
+            matched_duels = pd.DataFrame(columns=['event_id', 'id'])
+            pressure_confirmed_match = pd.DataFrame(columns=['event_id', 'id'])
+        else:
+            matched_pressure_sb, matched_pressure_skc = match_pressures_sb(sb_pressure, obe_sorted)
 
-        sb_tackles = sb_duels.query("duel_type_name == 'Tackle'").copy()
-        matched_duels, duels_used_ids = match_duels(sb_tackles, obe_sorted, 'statsbomb', duels_used_ids)
+            sb_tackles = sb_duels.query("duel_type_name == 'Tackle'").copy()
+            matched_duels, duels_used_ids = match_duels(sb_tackles, obe_sorted, 'statsbomb', duels_used_ids)
 
-        pressure_confirmed_match = matched_pressure_sb.merge(matched_pressure_skc, on=['event_id', 'id'], how='inner')
-        pressure_used_ids = pressure_used_ids.union(set(pressure_confirmed_match['id'].values))
+            pressure_confirmed_match = matched_pressure_sb.merge(
+                matched_pressure_skc, on=['event_id', 'id'], how='inner'
+            )
+            pressure_used_ids = pressure_used_ids.union(set(pressure_confirmed_match['id'].values))
 
         skc_events_mapping, statsbomb_events_mapping = apply_sb_output_format(
             sb_events_sync, self.skc_events, mapping_pp_bundles, matched_duels, pressure_confirmed_match
