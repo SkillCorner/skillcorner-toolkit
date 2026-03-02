@@ -8,8 +8,7 @@ The objective is to synchronize the events provided by Wyscout, Opta, StatsBomb,
 2. [Installation](#installation)
 3. [Usage with tracking](#usage-with-tracking)
 4. [Usage with dynamic events only](#usage-with-dynamic-events-only)
-5. [Robustness — missing on_ball_engagement](#robustness--missing-on_ball_engagement)
-6. [License](#license)
+5. [License](#license)
 
 ## Description
 
