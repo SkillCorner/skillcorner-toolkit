@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from event_synchronization.constants import PERIOD_STARTS
+from event_synchronization.events_utils.impect import normalize_impect_response
 from event_synchronization.with_dynamic_events.offset_manager import OffsetSyncManager
 from event_synchronization.with_dynamic_events.utils import (
     apply_matching_duels,
@@ -33,7 +34,7 @@ RM_IMP_TYPES = [
 class ImpectSyncDynamicEventsManager:
     def __init__(self, skc_events: pd.DataFrame, raw_impect_events: pd.DataFrame, impect_events_manager: Any) -> None:  # noqa: ANN401
         self.skc_events = skc_events
-        self.raw_impect_events = raw_impect_events
+        self.raw_impect_events = normalize_impect_response(raw_impect_events)
         self.impect_events_manager = impect_events_manager
 
     def enrich_impect_events(self) -> pd.DataFrame:

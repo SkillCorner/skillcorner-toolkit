@@ -27,6 +27,22 @@ PERIOD_STARTS_IN_SEC = {
 }
 
 
+def normalize_impect_response(impect_response: dict | list) -> dict | list:
+    """Unwrap Impect API response envelope if present.
+
+    Supports two formats:
+    - New API format: { "data": <dict|list>, "status": 200, "message": "..." }
+    - Old format: data directly (dict or list)
+    """
+    if isinstance(impect_response, dict) and "data" in impect_response and "status" in impect_response:
+        return impect_response["data"]
+    return impect_response
+
+
+# Keep old name as alias for backwards compatibility
+normalize_impect_match_data = normalize_impect_response
+
+
 class ImpectEvents:
     def __init__(
         self,
@@ -34,12 +50,12 @@ class ImpectEvents:
         impect_match_data: dict,
         match_data: dict,
     ) -> None:
-        self.raw_events = raw_impect_events
-        self.impect_match_data = impect_match_data
+        self.raw_events = normalize_impect_response(raw_impect_events)
+        self.impect_match_data = normalize_impect_response(impect_match_data)
         self.match_data = match_data
 
         self.impect_team_id_to_skc_team_id, self.impect_ply_id_to_skc_ply_id = get_impect_id_to_skc_id(
-            match_data, impect_match_data
+            match_data, self.impect_match_data
         )
         self.event_provider = 'impect'
         self.previous_event_type_name = None
